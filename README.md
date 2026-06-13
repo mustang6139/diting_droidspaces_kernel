@@ -33,7 +33,7 @@ namespace/cgroup options) turned off. These are compile-time switches — no roo
 trick, no Magisk module, no amount of praying will enable them at runtime. You
 have to rebuild the kernel.
 
-So I did. I downloaded the entire LineageOS source tree (~250 GB, yes, really),
+So I did. I downloaded the entire LineageOS source tree (~400 GB, yes, really),
 found the device kernel config fragment, added the missing options, rebuilt
 everything from scratch, flashed it, and — **it worked**. Full containers on the
 phone. My own tiny homelab running Debian on a 2022 flagship that was otherwise
@@ -70,9 +70,11 @@ over-engineered, shared in the hope it saves someone a weekend.
 ## Requirements
 
 * A Linux build host (these instructions assume **Arch**; adapt as needed).
-* ~250 GB free disk space. Yes, really.
-* Enough RAM **+ swap** — `soong` peaks around 13 GB. With 16 GB RAM, add a
-  swapfile. A big one. Don't ask how I know.
+* **~400 GB free disk space.** Yes, really. LineageOS 21+ needs that much, plus
+  extra if you enable ccache (worth it). SSDs make a huge difference here.
+* **RAM:** LineageOS officially recommends 64 GB for lineage-21+. In practice,
+  16 GB + a big swapfile works, but `soong` peaks around 13 GB and will
+  OOM-abort without the swap. Don't ask how I know.
 * `repo`, `git`, `git-lfs`, `ccache`, `base-devel` (or your distro's AOSP build deps).
 * The AOSP build tools want **bash** or **zsh**. Not fish. Fish will betray you.
 
@@ -88,8 +90,8 @@ git lfs install      # CRITICAL — skip this and blobs download as text pointer
 
 # 1) get the source (grab a coffee, maybe lunch too)
 mkdir -p ~/android/lineage && cd ~/android/lineage
-repo init -u https://github.com/LineageOS/android.git -b lineage-23.2 --git-lfs
-repo sync -j"$(nproc)"
+repo init -u https://github.com/LineageOS/android.git -b lineage-23.2 --git-lfs --no-clone-bundle
+repo sync                  # don't add -j here; LineageOS defaults (-j4 -c) are deliberate
 
 # 2) device + kernel + vendor trees
 source build/envsetup.sh
@@ -98,7 +100,7 @@ breakfast diting
 # 3) proprietary vendor blobs (breakfast does NOT pull these automatically)
 mkdir -p .repo/local_manifests
 cp /path/to/this/repo/diting.xml .repo/local_manifests/
-repo sync -j"$(nproc)"     # now pulls vendor/xiaomi/{diting,sm8450-common}
+repo sync                  # now pulls vendor/xiaomi/{diting,sm8450-common}
 
 # 4) drop the scripts in the source root
 cp /path/to/this/repo/apply-droidspaces.sh /path/to/this/repo/update.sh .

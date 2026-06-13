@@ -16,7 +16,7 @@ echo "[*] Discarding our local kernel edits so sync is clean..."
 ( cd kernel/xiaomi/sm8450 && git checkout -- . 2>/dev/null || true )
 
 echo "[*] Syncing latest LineageOS sources..."
-repo sync -j"$(nproc)"
+repo sync               # LineageOS defaults (-j4 -c) are deliberate; don't override
 
 echo "[*] Re-applying Droidspaces (+ KernelSU-Next)..."
 "$HERE/apply-droidspaces.sh"
