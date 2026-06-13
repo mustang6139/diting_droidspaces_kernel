@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <!-- Xiaomi 12T Pro (diting) proprietary vendor blobs — TheMuppets, lineage-23.2.
+       breakfast/brunch does NOT pull these automatically; this local manifest does.
+       Requires Git LFS to be installed (see README), otherwise the blobs come down
+       as text pointers and the build fails with SHA1 mismatches / corrupt APKs. -->
+  <project name="TheMuppets/proprietary_vendor_xiaomi_diting"
+           path="vendor/xiaomi/diting"
+           remote="github"
+           revision="lineage-23.2" />
+
+  <project name="TheMuppets/proprietary_vendor_xiaomi_sm8450-common"
+           path="vendor/xiaomi/sm8450-common"
+           remote="github"
+           revision="lineage-23.2" />
+</manifest>
