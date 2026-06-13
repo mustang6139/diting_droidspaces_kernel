@@ -10,7 +10,10 @@
 # result is identical whether the tree is fresh or already patched. Re-running
 # never duplicates anything.
 #
-# Usage (from the LineageOS source root, in bash — NOT fish):
+# Usage (from the LineageOS source root):
+#   This script itself runs fine from fish. Call it directly.
+#   The *build* step after this (source build/envsetup.sh && brunch) needs bash though.
+#
 #   ./apply-droidspaces.sh                 # config + KernelSU-Next (root for containers)
 #   WITH_KSU=0 ./apply-droidspaces.sh      # only the namespace config, no root baked in
 #   KSU_TAG=v3.2.0 ./apply-droidspaces.sh  # pin a specific KernelSU-Next release
@@ -86,7 +89,7 @@ cat <<'EOF'
 ────────────────────────────────────────────────────────────────────
 Ready. Build and flash:
 
-  bash                                   # AOSP build needs bash, not fish
+  bash                                   # AOSP build needs bash - if you use fish
   ulimit -v unlimited                    # per-shell; prevents soong OOM-abort
   source build/envsetup.sh
   brunch diting

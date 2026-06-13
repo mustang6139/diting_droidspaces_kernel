@@ -47,6 +47,27 @@ over-engineered, shared in the hope it saves someone a weekend.
 
 ---
 
+## A note on shell (important, read this)
+
+This whole repo assumes you use **fish** as your daily shell, as god intended.
+The scripts themselves are fine - they have `#!/usr/bin/env bash` so they run in
+bash regardless of what you're typing in. The problem is `source build/envsetup.sh`,
+which is part of the AOSP build system and was written by people who have never
+heard of fish. It will spectacularly fail with something like:
+
+```
+build/envsetup.sh (line N): Missing end to balance this if statement
+```
+
+So: **any time these instructions say `source build/envsetup.sh` or `brunch`,
+you need to be in a bash session first.** Just run `bash` in your terminal,
+do the build stuff, then `exit` back to fish when you're done.
+
+The scripts (`apply-droidspaces.sh`, `update.sh`) you can run directly from fish,
+no problem.
+
+---
+
 ## What this actually does
 
 * Appends the required namespace/cgroup/IPC kernel options to the device GKI
@@ -69,14 +90,77 @@ over-engineered, shared in the hope it saves someone a weekend.
 ## Requirements
 
 * A Linux build host (these instructions assume **Arch**; adapt as needed).
+  Windows: no idea, haven't seen one in years, not my problem.
 * **~400 GB free disk space.** Yes, really. LineageOS 21+ needs that much, plus
   extra if you enable ccache (worth it). SSDs make a huge difference here.
 * **RAM:** LineageOS officially recommends 64 GB for lineage-21+. In practice,
-  16 GB works if you throw a big swapfile at it. I used a temporary 32 GB one,
-  disabled `systemd-oom` for the duration of the build, and it was fine. Cursing
-  optional but cathartic.
+  16 GB works fine with a temporary swapfile - see below for how to set that up
+  properly without suffering.
 * `repo`, `git`, `git-lfs`, `ccache`, `base-devel` (or your distro's AOSP build deps).
-* The AOSP build tools want **bash** or **zsh**. Not fish. Fish will betray you.
+* Fish shell (or bash/zsh if you're boring). See the shell note above.
+
+---
+
+## Preparing your system for the build
+
+### Step 1: temporary swapfile (skip if you have 32+ GB RAM)
+
+The build needs a lot of memory. `soong` alone peaks around 13 GB, and the rest
+of the build adds on top of that. With 16 GB RAM you need a swapfile. Do this
+**before** you start syncing.
+
+**On Btrfs** (use this, not fallocate - fallocate on Btrfs gives `swapon: Invalid argument`):
+
+```bash
+sudo btrfs filesystem mkswapfile --size 32g /swapfile
+sudo swapon /swapfile
+```
+
+**On ext4 / other filesystems:**
+
+```bash
+sudo fallocate -l 32G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+```
+
+Verify it's active:
+
+```bash
+swapon --show
+# should show /swapfile with 32G size
+```
+
+After the build is done, clean up:
+
+```bash
+sudo swapoff /swapfile
+sudo rm /swapfile
+```
+
+### Step 2: disable systemd-oomd for the duration of the build
+
+`systemd-oomd` is the out-of-memory killer daemon that tries to protect your
+system by killing hungry processes. The build **is** a hungry process. Without
+disabling it, oomd will happily murder `soong` mid-build and you'll be staring
+at a silent exit code 1 wondering what went wrong.
+
+```bash
+sudo systemctl stop systemd-oomd
+```
+
+Turn it back on after the build:
+
+```bash
+sudo systemctl start systemd-oomd
+```
+
+If you want to check whether it's running:
+
+```bash
+systemctl status systemd-oomd
+```
 
 ---
 
@@ -88,20 +172,17 @@ sudo pacman -S --needed git git-lfs base-devel ccache repo
 git lfs install      # CRITICAL - skip this and blobs download as text pointers
                      # -> SHA1 mismatch -> corrupt APKs -> fun debugging session
 
-# 0.5) if you have 16 GB RAM, add a temporary swapfile and disable systemd-oom
-sudo systemctl stop systemd-oomd
-sudo btrfs filesystem mkswapfile --size 32g /swapfile   # btrfs - use this, not fallocate
-# (or: sudo fallocate -l 32G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile)
-sudo swapon /swapfile
-
 # 1) get the source (grab a coffee, maybe lunch too)
 mkdir -p ~/android/lineage && cd ~/android/lineage
 repo init -u https://github.com/LineageOS/android.git -b lineage-23.2 --git-lfs --no-clone-bundle
 repo sync                  # don't add -j here; LineageOS defaults (-j4 -c) are deliberate
 
 # 2) device + kernel + vendor trees
+# note: source build/envsetup.sh requires bash - if you're in fish, run `bash` first
+bash
 source build/envsetup.sh
 breakfast diting
+exit                       # back to fish
 
 # 3) proprietary vendor blobs (breakfast does NOT pull these automatically)
 mkdir -p .repo/local_manifests
@@ -118,11 +199,16 @@ chmod +x apply-droidspaces.sh update.sh
 ## Build
 
 ```bash
+# apply-droidspaces.sh can be run directly from fish
 ./apply-droidspaces.sh          # apply config + integrate KernelSU-Next
                                 # (use WITH_KSU=0 if you don't want root baked in)
+
+# source build/envsetup.sh and brunch need bash
+bash
 ulimit -v unlimited             # per-shell; prevents soong from OOM-aborting
 source build/envsetup.sh
 brunch diting
+# when done: exit
 ```
 
 Then flash the three images the kernel config affects. **Back up your current ones first**, or live dangerously, I'm not your mom.
@@ -153,8 +239,11 @@ adb shell su -c 'droidspaces check'
 This is the whole point of the toolkit, one command, clean every time:
 
 ```bash
-cd ~/android/lineage
-./update.sh               # resets our edits, repo sync, re-applies everything
+# update.sh runs fine from fish
+./update.sh
+
+# then build in bash as usual
+bash
 ulimit -v unlimited
 source build/envsetup.sh && brunch diting
 ```
@@ -196,9 +285,9 @@ The gotchas I already hit, so you don't have to:
 
 | Symptom | Cause / fix |
 |---|---|
-| `swapon: Invalid argument` | Btrfs swapfile: use `btrfs filesystem mkswapfile --size 32g /swapfile`, not `fallocate`. Classic. |
-| `build/envsetup.sh ... Missing end ... if` | You're in **fish**. Run `bash` first. Every time. |
-| soong exits silently with code 1, ~13 GB RSS | Memory / `ulimit`. Set `ulimit -v unlimited`, add swap, disable systemd-oomd. |
+| `swapon: Invalid argument` | Btrfs swapfile: use `btrfs filesystem mkswapfile --size 32g /swapfile`, not `fallocate`. |
+| `build/envsetup.sh ... Missing end ... if` | You're in fish. Run `bash` first, then `source build/envsetup.sh`. |
+| soong exits silently with code 1, ~13 GB RSS | Memory: set `ulimit -v unlimited`, add a 32 GB swapfile, stop systemd-oomd. All three. |
 | `vendor/xiaomi/diting/...-vendor.mk does not exist` | Vendor blobs missing: add `diting.xml` to `.repo/local_manifests/`, then `repo sync`. |
 | `SHA1 mismatch` (e.g. `abl.img`) / `failed opening zip` (webview.apk) | Git LFS not active, blobs downloaded as text pointers. Run `git lfs install`, then `repo forall -c 'git lfs pull'`. |
 | `check_vintf ... CONFIG_SYSVIPC ... required n` | Don't enable `SYSVIPC`. This toolkit already leaves it off on purpose. |
