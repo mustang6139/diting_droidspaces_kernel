@@ -1,23 +1,22 @@
-# Droidspaces on LineageOS — Xiaomi 12T Pro (diting)
+# Droidspaces on LineageOS - Xiaomi 12T Pro (diting)
 
 > *Or: how I turned a perfectly good paperweight into a perfectly good homelab.*
 
 ## The backstory (skip if you just want the commands)
 
-So I had this Xiaomi 12T Pro sitting in a drawer. Couldn't sell it anymore —
+So I had this Xiaomi 12T Pro sitting in a drawer. Couldn't sell it anymore,
 market value had dropped to "yeah, good luck with that". Couldn't throw it away
-— felt wrong, it's a great piece of hardware. Couldn't *not* use it — that felt
-even worse.
+either, it's a great piece of hardware. Couldn't *not* use it, that felt even worse.
 
 Then I had The Idea™: **what if I run Linux on it and make a tiny homelab?**
 
 Naturally I Googled my way through the usual options:
 
-- **Termux** — great, but it's essentially a sandbox with a terminal stapled on.
+- **Termux:** great, but it's essentially a sandbox with a terminal stapled on.
   No real namespaces, no containers, forget it.
-- **proot** — fakes a filesystem root. Cute, but half your syscalls are emulated
+- **proot:** fakes a filesystem root. Cute, but half your syscalls are emulated
   and the other half just lie to you.
-- **Emulators** — bless their hearts.
+- **Emulators:** bless their hearts.
 
 Then I found [Droidspaces](https://github.com/ravindu644/Droidspaces-OSS). Full
 Linux containers. Real namespaces. Actual hardware access. *chef's kiss*
@@ -29,13 +28,13 @@ The kernel didn't support it.
 **Of course it didn't.**
 
 LineageOS builds the GKI kernel with `CONFIG_PID_NS` (and a bunch of
-namespace/cgroup options) turned off. These are compile-time switches — no root
+namespace/cgroup options) turned off. These are compile-time switches, no root
 trick, no Magisk module, no amount of praying will enable them at runtime. You
 have to rebuild the kernel.
 
 So I did. I downloaded the entire LineageOS source tree (~400 GB, yes, really),
 found the device kernel config fragment, added the missing options, rebuilt
-everything from scratch, flashed it, and — **it worked**. Full containers on the
+everything from scratch, flashed it, and it **worked**. Full containers on the
 phone. My own tiny homelab running Debian on a 2022 flagship that was otherwise
 heading for the drawer of forgotten gadgets.
 
@@ -60,7 +59,7 @@ over-engineered, shared in the hope it saves someone a weekend.
 
 > **Why not use a prebuilt Droidspaces kernel?**
 > Generic "Droidspaces kernels" floating around the internet are built against the
-> **stock** Xiaomi vendor ABI. On LineageOS they bootloop — different module
+> **stock** Xiaomi vendor ABI. On LineageOS they bootloop - different module
 > vermagic, no matching `vendor_dlkm`. Building from the LineageOS source
 > rebuilds the kernel *and* all vendor modules together with a consistent ABI.
 > It's the only path that actually works, and yes, it takes a while.
@@ -73,8 +72,9 @@ over-engineered, shared in the hope it saves someone a weekend.
 * **~400 GB free disk space.** Yes, really. LineageOS 21+ needs that much, plus
   extra if you enable ccache (worth it). SSDs make a huge difference here.
 * **RAM:** LineageOS officially recommends 64 GB for lineage-21+. In practice,
-  16 GB + a big swapfile works, but `soong` peaks around 13 GB and will
-  OOM-abort without the swap. Don't ask how I know.
+  16 GB works if you throw a big swapfile at it. I used a temporary 32 GB one,
+  disabled `systemd-oom` for the duration of the build, and it was fine. Cursing
+  optional but cathartic.
 * `repo`, `git`, `git-lfs`, `ccache`, `base-devel` (or your distro's AOSP build deps).
 * The AOSP build tools want **bash** or **zsh**. Not fish. Fish will betray you.
 
@@ -83,10 +83,16 @@ over-engineered, shared in the hope it saves someone a weekend.
 ## One-time setup
 
 ```bash
-# 0) build deps (Arch) — git-lfs MUST be installed AND initialised
+# 0) build deps (Arch) - git-lfs MUST be installed AND initialised
 sudo pacman -S --needed git git-lfs base-devel ccache repo
-git lfs install      # CRITICAL — skip this and blobs download as text pointers
+git lfs install      # CRITICAL - skip this and blobs download as text pointers
                      # -> SHA1 mismatch -> corrupt APKs -> fun debugging session
+
+# 0.5) if you have 16 GB RAM, add a temporary swapfile and disable systemd-oom
+sudo systemctl stop systemd-oomd
+sudo btrfs filesystem mkswapfile --size 32g /swapfile   # btrfs - use this, not fallocate
+# (or: sudo fallocate -l 32G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile)
+sudo swapon /swapfile
 
 # 1) get the source (grab a coffee, maybe lunch too)
 mkdir -p ~/android/lineage && cd ~/android/lineage
@@ -119,7 +125,7 @@ source build/envsetup.sh
 brunch diting
 ```
 
-Then flash the three images the kernel config affects. **Back up your current ones first** — or live dangerously, I'm not your mom.
+Then flash the three images the kernel config affects. **Back up your current ones first**, or live dangerously, I'm not your mom.
 
 ```bash
 cd out/target/product/diting
@@ -136,15 +142,15 @@ Verify everything is happy:
 
 ```bash
 adb shell su -c 'droidspaces check'
-# → all namespaces green
-# → tiny internal celebration
+# -> all namespaces green
+# -> tiny internal celebration
 ```
 
 ---
 
 ## Updating after a LineageOS build / kernel update
 
-This is the whole point of the toolkit — one command, clean every time:
+This is the whole point of the toolkit, one command, clean every time:
 
 ```bash
 cd ~/android/lineage
@@ -162,7 +168,7 @@ Go make coffee. Or dinner. Or sleep. Come back, flash, done.
 The GKI kernel config is assembled from `gki_defconfig` plus vendor fragments,
 merged in order. The device fragment
 `arch/arm64/configs/vendor/diting_GKI.config` is merged **last**, which means
-anything we append there wins over the GKI defaults — including turning
+anything we append there wins over the GKI defaults, including turning
 `CONFIG_PID_NS` back on.
 
 The diting device builds **every** kernel module from source (zero prebuilt
@@ -170,7 +176,7 @@ The diting device builds **every** kernel module from source (zero prebuilt
 consistent ABI. No bootloop. This is also why you have to flash all three images.
 
 **Why no `CONFIG_SYSVIPC`?** The Android 16 VINTF compatibility matrix requires
-it disabled — enabling it makes `check_vintf` fail at build time. Fortunately,
+it disabled, enabling it makes `check_vintf` fail at build time. Fortunately,
 IPC namespaces only need `(SYSVIPC || POSIX_MQUEUE)`, so `CONFIG_POSIX_MQUEUE=y`
 keeps `CONFIG_IPC_NS` working without upsetting the VINTF police.
 
@@ -190,11 +196,11 @@ The gotchas I already hit, so you don't have to:
 
 | Symptom | Cause / fix |
 |---|---|
-| `swapon: Invalid argument` | Btrfs swapfile — use `btrfs filesystem mkswapfile --size 32g /swapfile`, not `fallocate`. Classic. |
+| `swapon: Invalid argument` | Btrfs swapfile: use `btrfs filesystem mkswapfile --size 32g /swapfile`, not `fallocate`. Classic. |
 | `build/envsetup.sh ... Missing end ... if` | You're in **fish**. Run `bash` first. Every time. |
-| soong exits silently with code 1, ~13 GB RSS | Memory / `ulimit`. Set `ulimit -v unlimited` and add swap. A lot of swap. |
-| `vendor/xiaomi/diting/...-vendor.mk does not exist` | Vendor blobs missing — add `diting.xml` to `.repo/local_manifests/`, then `repo sync`. |
-| `SHA1 mismatch` (e.g. `abl.img`) / `failed opening zip` (webview.apk) | Git LFS not active — blobs downloaded as text pointers. Run `git lfs install`, then `repo forall -c 'git lfs pull'`. |
+| soong exits silently with code 1, ~13 GB RSS | Memory / `ulimit`. Set `ulimit -v unlimited`, add swap, disable systemd-oomd. |
+| `vendor/xiaomi/diting/...-vendor.mk does not exist` | Vendor blobs missing: add `diting.xml` to `.repo/local_manifests/`, then `repo sync`. |
+| `SHA1 mismatch` (e.g. `abl.img`) / `failed opening zip` (webview.apk) | Git LFS not active, blobs downloaded as text pointers. Run `git lfs install`, then `repo forall -c 'git lfs pull'`. |
 | `check_vintf ... CONFIG_SYSVIPC ... required n` | Don't enable `SYSVIPC`. This toolkit already leaves it off on purpose. |
 
 ---
