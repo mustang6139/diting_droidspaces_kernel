@@ -186,7 +186,21 @@ exit                       # back to fish
 
 # 3) proprietary vendor blobs (breakfast does NOT pull these automatically)
 mkdir -p .repo/local_manifests
-cp /path/to/this/repo/diting.xml .repo/local_manifests/
+
+cat > .repo/local_manifests/diting.xml << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="TheMuppets/proprietary_vendor_xiaomi_diting"
+           path="vendor/xiaomi/diting"
+           remote="github"
+           revision="lineage-23.2" />
+  <project name="TheMuppets/proprietary_vendor_xiaomi_sm8450-common"
+           path="vendor/xiaomi/sm8450-common"
+           remote="github"
+           revision="lineage-23.2" />
+</manifest>
+EOF
+
 repo sync                  # now pulls vendor/xiaomi/{diting,sm8450-common}
 
 # 4) drop the scripts in the source root
