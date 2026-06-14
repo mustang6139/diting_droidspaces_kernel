@@ -63,8 +63,25 @@ CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
 CONFIG_NF_CONNTRACK_NETLINK=y
 CONFIG_NF_NAT_REDIRECT=y
 # <<< droidspaces <<<
+
+# >>> docker >>>
+# iptables/netfilter support so Docker doesn't complain about missing chains
+CONFIG_BRIDGE_NETFILTER=y
+CONFIG_NF_CONNTRACK=y
+CONFIG_NF_NAT=y
+CONFIG_IP_NF_IPTABLES=y
+CONFIG_IP_NF_FILTER=y
+CONFIG_IP_NF_NAT=y
+CONFIG_IP_NF_TARGET_MASQUERADE=y
+CONFIG_NETFILTER_XT_MATCH_CONNTRACK=y
+CONFIG_NETFILTER_XT_MARK=y
+# resource limits (optional but useful)
+CONFIG_CPUSETS=y
+CONFIG_CGROUP_CPUACCT=y
+CONFIG_CFS_BANDWIDTH=y
+# <<< docker <<<
 EOF
-echo "[+] Droidspaces config applied -> $FRAG"
+echo "[+] Droidspaces + Docker config applied -> $FRAG"
 
 # --- 2. Root via KernelSU-Next (optional; Droidspaces needs root) ----------------
 # Update-safe: after a re-sync the driver wiring is gone even if the clone dir
